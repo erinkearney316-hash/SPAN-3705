@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f3f1e9" />
+    <title>Enlazados al otro lado del Atlántico</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #1d2928;
+        --muted: #64716e;
+        --paper: #f3f1e9;
+        --panel: rgba(250, 249, 244, 0.96);
+        --line: #dedfd6;
+        --green: #376d5b;
+        --coral: #c6684e;
+        --yellow: #dfb958;
+        font-family: "DM Sans", sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+      button, input, select { font: inherit; }
+      button { color: inherit; }
+
+      #map {
+        position: absolute;
+        inset: 0;
+        background: #d7e5e5;
+      }
+
+      .leaflet-container { font-family: "DM Sans", sans-serif; }
+      .leaflet-control-attribution {
+        margin: 0 12px 10px 0 !important;
+        padding: 4px 7px !important;
+        border-radius: 3px;
+        color: #53615c !important;
+        background: rgba(250, 249, 244, 0.88) !important;
+        font-size: 10px !important;
+      }
+      .leaflet-control-attribution a { color: #376d5b !important; }
+
+      .topbar {
+        position: absolute;
+        z-index: 500;
+        inset: 0 0 auto;
+        min-height: 74px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 26px;
+        border-bottom: 1px solid rgba(32, 54, 48, 0.12);
+        background: rgba(243, 241, 233, 0.94);
+        backdrop-filter: blur(12px);
+      }
+      .brand { display: flex; align-items: center; gap: 13px; }
+      .brand-mark {
+        display: grid;
+        width: 36px;
+        height: 36px;
+        place-items: center;
+        border: 1px solid #759384;
+        border-radius: 50%;
+        color: var(--green);
+        font-family: Georgia, serif;
+        font-size: 19px;
+      }
+      .brand-name { font-family: "Playfair Display", Georgia, serif; font-size: 19px; line-height: 1.1; }
+      .brand-caption { max-width: 520px; margin-top: 4px; color: var(--muted); font-size: 10px; font-weight: 600; }
+      .top-meta { display: flex; align-items: center; gap: 18px; color: var(--muted); font-size: 11px; }
+      .live-mark { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #54856e; }
+      .edition { padding-left: 18px; border-left: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+
+      .panel {
+        position: absolute;
+        z-index: 450;
+        top: 96px;
+        right: 22px;
+        width: 328px;
+        max-height: min(390px, calc(100vh - 118px));
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid rgba(62, 80, 71, 0.16);
+        border-radius: 5px;
+        background: var(--panel);
+        box-shadow: 0 12px 40px rgba(34, 49, 43, 0.13);
+        animation: arrive 380ms ease-out both;
+      }
+      .panel-head { padding: 20px 20px 15px; border-bottom: 1px solid var(--line); }
+      .eyebrow { color: var(--green); font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+      h1 { margin: 6px 0 15px; font-family: "Playfair Display", Georgia, serif; font-size: 25px; font-weight: 500; }
+      .search-wrap { position: relative; }
+      .search-wrap::before { position: absolute; top: 11px; left: 12px; color: #78827b; content: "⌕"; font-size: 20px; line-height: 1; }
+      #search {
+        width: 100%;
+        height: 40px;
+        padding: 0 12px 0 36px;
+        border: 1px solid #d5d9d0;
+        border-radius: 3px;
+        outline: none;
+        background: #fffefa;
+        color: var(--ink);
+        font-size: 12px;
+      }
+      #search:focus { border-color: #638977; box-shadow: 0 0 0 2px rgba(55, 109, 91, 0.12); }
+      .filters { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 12px; }
+      #region {
+        min-width: 0;
+        height: 31px;
+        padding: 0 25px 0 9px;
+        border: 0;
+        border-radius: 2px;
+        background: #e9eee7;
+        color: #37594c;
+        font-size: 10px;
+        font-weight: 600;
+      }
+      .count { color: var(--muted); font-size: 10px; white-space: nowrap; }
+      .place-list { overflow: auto; padding: 4px 10px 10px; scrollbar-color: #c8d0c8 transparent; scrollbar-width: thin; }
+      .place-row {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 31px 1fr auto;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 9px;
+        border: 0;
+        border-bottom: 1px solid #e8e8e0;
+        background: transparent;
+        cursor: pointer;
+        text-align: left;
+        transition: background 140ms ease;
+      }
+      .place-row:hover, .place-row.is-active { background: #edf1e9; }
+      .place-index { color: #829087; font-family: Georgia, serif; font-size: 13px; }
+      .place-name { display: block; font-size: 12px; font-weight: 600; }
+      .place-country { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+      .place-continent { color: #8a938c; font-size: 9px; text-align: right; }
+      .empty-state { padding: 24px 12px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      .map-tools {
+        position: absolute;
+        z-index: 450;
+        right: 20px;
+        bottom: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        animation: arrive 500ms 100ms ease-out both;
+      }
+      .tool-group { display: flex; overflow: hidden; border: 1px solid rgba(62, 80, 71, 0.2); border-radius: 4px; background: var(--panel); box-shadow: 0 5px 18px rgba(34, 49, 43, 0.12); }
+      .tool-button {
+        min-width: 38px;
+        height: 38px;
+        padding: 0 11px;
+        border: 0;
+        border-right: 1px solid var(--line);
+        background: transparent;
+        color: #40544a;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .tool-button:last-child { border-right: 0; }
+      .tool-button:hover { background: #e9eee7; }
+      .tool-button[aria-pressed="true"] { background: #dfe9df; color: #285643; }
+      .tool-button.zoom { width: 39px; padding: 0; font-size: 20px; font-weight: 400; }
+      .tool-button.location { padding-inline: 13px; }
+
+      .map-star { display: block; color: #f0c63e; font-size: 30px; line-height: 1; -webkit-text-stroke: 1px #72581a; paint-order: stroke fill; filter: drop-shadow(0 1px 2px rgba(28, 44, 37, 0.55)); transition: transform 160ms ease; }
+      .map-star.is-active { transform: scale(1.32); }
+      .influence-route { animation: route-flow 900ms linear infinite; }
+      .route-head { color: #c6684e; font-size: 28px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(28, 44, 37, 0.45)); animation: arrow-nudge 700ms ease-in-out infinite; }
+      .influence-label { padding: 5px 8px; border: 1px solid rgba(62, 80, 71, 0.18); border-radius: 3px; background: rgba(250, 249, 244, 0.96); box-shadow: 0 3px 12px rgba(34, 49, 43, 0.12); color: #354d41; font-size: 10px; font-weight: 700; }
+      .influence-label::before { display: none; }
+      .slideshow-dialog {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: min(560px, calc(100vw - 48px));
+        height: min(500px, calc(100vh - 80px));
+        max-width: none;
+        max-height: none;
+        margin: 0;
+        padding: 0;
+        transform: translate(-50%, -50%);
+        overflow: hidden;
+        border: 1px solid rgba(62, 80, 71, 0.24);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--ink);
+        box-shadow: 0 24px 80px rgba(21, 33, 30, 0.3);
+      }
+      .slideshow-dialog[open] { display: block; animation: dialog-arrive 180ms ease-out both; }
+      .slideshow-dialog::backdrop { background: rgba(20, 33, 31, 0.16); }
+      .slideshow-dialog.is-expanded { top: 12px; left: 12px; width: calc(100vw - 24px); height: calc(100vh - 24px); transform: none; }
+      .slideshow-dialog.is-expanded::backdrop { background: rgba(20, 33, 31, 0.4); }
+      .slideshow-inner { width: 100%; height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 18px; padding: 26px; }
+      .slideshow-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+      .slideshow-header h2 { margin: 5px 0 0; font-family: "Playfair Display", Georgia, serif; font-size: 32px; font-weight: 500; }
+      .slideshow-region { margin: 5px 0 0; color: var(--green); font-size: 11px; font-weight: 600; }
+      .slideshow-context { max-width: 430px; margin: 6px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+      .slideshow-actions { display: flex; gap: 8px; }
+      .slideshow-icon, .slideshow-nav { display: grid; flex: 0 0 auto; width: 40px; height: 40px; place-items: center; border: 1px solid var(--line); border-radius: 3px; background: #f5f4ed; color: #3b5549; cursor: pointer; font-size: 19px; }
+      .slideshow-icon:hover, .slideshow-nav:hover { background: #e9eee7; }
+      .slideshow-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+      .slideshow-tab { min-height: 46px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #6b7771; cursor: pointer; font-size: 13px; font-weight: 600; }
+      .slideshow-tab.is-active { border-bottom-color: var(--coral); color: var(--ink); }
+      .slideshow-panel { min-height: 0; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 16px; overflow-y: auto; padding: 24px; border: 1px solid #e5e4dc; border-radius: 4px; background: #f7f6f0; text-align: left; scrollbar-color: #c8d0c8 transparent; scrollbar-width: thin; }
+      .slideshow-panel h3 { margin: 0; font-family: "Playfair Display", Georgia, serif; font-size: 28px; font-weight: 500; }
+      .slideshow-placeholder { margin: 0; color: #78827b; font-size: 13px; }
+      .slideshow-content { color: #394842; font-size: 13px; line-height: 1.7; }
+      .slideshow-content p { margin: 0 0 14px; }
+      .slideshow-content h4 { margin: 22px 0 8px; color: #2f5e4e; font-size: 11px; font-weight: 700; }
+      .slideshow-content p + h4 { margin-top: 20px; }
+      .slideshow-citations { margin: 0; padding-left: 18px; }
+      .slideshow-citations li { padding-left: 4px; margin: 0 0 9px; overflow-wrap: anywhere; }
+      .slideshow-citations a { color: #376d5b; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+      .slideshow-footer { display: flex; align-items: center; justify-content: space-between; }
+      .slideshow-count { color: #6b7771; font-size: 11px; font-variant-numeric: tabular-nums; }
+      @keyframes dialog-arrive { from { opacity: 0; } to { opacity: 1; } }
+      @media (max-width: 640px) {
+        .slideshow-dialog { width: calc(100vw - 24px); height: min(500px, calc(100vh - 48px)); }
+        .slideshow-dialog.is-expanded { top: 10px; left: 10px; width: calc(100vw - 20px); height: calc(100vh - 20px); }
+        .slideshow-inner { gap: 13px; padding: 17px; }
+        .slideshow-header h2 { font-size: 26px; }
+        .slideshow-tab { min-height: 42px; font-size: 11px; }
+        .slideshow-panel { padding: 16px; }
+        .slideshow-content { font-size: 12px; }
+      }
+      .user-dot { width: 15px; height: 15px; border: 3px solid white; border-radius: 50%; background: #3974ac; box-shadow: 0 0 0 5px rgba(57, 116, 172, 0.2); }
+      .toast { position: absolute; z-index: 700; bottom: 25px; left: 50%; transform: translate(-50%, 12px); padding: 10px 14px; border: 1px solid rgba(62, 80, 71, 0.2); border-radius: 4px; background: #f9f8f2; box-shadow: 0 5px 20px rgba(34, 49, 43, 0.12); color: var(--ink); font-size: 11px; opacity: 0; pointer-events: none; transition: 180ms ease; }
+      .toast.is-visible { transform: translate(-50%, 0); opacity: 1; }
+
+      @keyframes arrive { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes route-flow { to { stroke-dashoffset: -36; } }
+      @keyframes arrow-nudge { 50% { transform: translateX(4px); } }
+      @media (max-width: 640px) {
+        .topbar { min-height: 62px; padding: 0 15px; }
+        .brand-mark { width: 32px; height: 32px; }
+        .brand-name { font-size: 17px; }
+        .topbar { gap: 10px; }
+        .brand { min-width: 0; }
+        .brand-name { font-size: 16px; }
+        .brand-caption { max-width: 76vw; font-size: 9px; line-height: 1.25; }
+        .top-meta { display: none; }
+        .panel { top: auto; right: 10px; bottom: 10px; left: 10px; width: auto; max-height: 48vh; }
+        .panel-head { padding: 13px 15px 11px; }
+        h1 { margin: 4px 0 10px; font-size: 21px; }
+        .place-list { padding: 2px 8px 8px; }
+        .place-row { padding: 9px 7px; }
+        .map-tools { right: 12px; bottom: calc(48vh + 22px); gap: 6px; }
+        .details { top: 73px; right: 10px; width: min(260px, calc(100vw - 20px)); }
+        .leaflet-bottom { bottom: 48vh; }
+        .leaflet-control-attribution { margin-bottom: 8px !important; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map" aria-label="Mapa interactivo de Centroamérica"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">N</div>
+        <div>
+          <div class="brand-name">Enlazados al otro lado del Atlántico</div>
+          <div class="brand-caption">Influencia cultural de África en países centroamericanos</div>
+        </div>
+      </div>
+      <div class="top-meta"><span><i class="live-mark"></i>EDICIÓN MUNDIAL</span><span class="edition">VOL. 01 &nbsp; / &nbsp; 2026</span></div>
+    </header>
+
+    <aside class="panel" aria-label="Explorar lugares">
+      <div class="panel-head">
+        <div class="eyebrow">Países seleccionados</div>
+        <h1>Centroamérica</h1>
+      </div>
+      <div class="place-list" id="place-list"></div>
+    </aside>
+
+    <dialog class="slideshow-dialog" id="slideshow-dialog" aria-labelledby="slideshow-country">
+      <div class="slideshow-inner">
+        <header class="slideshow-header">
+          <div>
+            <div class="eyebrow">Lugares y cultura</div>
+            <h2 id="slideshow-country"></h2>
+            <p class="slideshow-region" id="slideshow-region"></p>
+            <p class="slideshow-context" id="slideshow-context"></p>
+          </div>
+          <div class="slideshow-actions">
+            <button class="slideshow-icon" id="slideshow-expand" type="button" aria-label="Expandir presentación" aria-expanded="false" title="Expandir">⤢</button>
+            <button class="slideshow-icon" id="slideshow-close" type="button" aria-label="Cerrar presentación" title="Cerrar">×</button>
+          </div>
+        </header>
+        <nav class="slideshow-tabs" role="tablist" aria-label="Temas culturales">
+          <button class="slideshow-tab" type="button" role="tab" data-slide="0">Música</button>
+          <button class="slideshow-tab" type="button" role="tab" data-slide="1">Baile</button>
+          <button class="slideshow-tab" type="button" role="tab" data-slide="2">Comida</button>
+          <button class="slideshow-tab" type="button" role="tab" data-slide="3">Lengua</button>
+        </nav>
+        <section class="slideshow-panel" id="slideshow-panel" role="tabpanel" aria-live="polite">
+          <h3 id="slideshow-title"></h3>
+          <div class="slideshow-placeholder" id="slideshow-placeholder"></div>
+        </section>
+        <footer class="slideshow-footer">
+          <span class="slideshow-count" id="slideshow-count" aria-live="polite"></span>
+          <div class="slideshow-actions">
+            <button class="slideshow-nav" id="slide-previous" type="button" aria-label="Diapositiva anterior">‹</button>
+            <button class="slideshow-nav" id="slide-next" type="button" aria-label="Diapositiva siguiente">›</button>
+          </div>
+        </footer>
+      </div>
+    </dialog>
+
+    <div class="map-tools" aria-label="Controles del mapa">
+      <div class="tool-group" role="group" aria-label="Estilo del mapa">
+        <button class="tool-button" id="street-layer" type="button" aria-pressed="true">Calles</button>
+        <button class="tool-button" id="quiet-layer" type="button" aria-pressed="false">Claro</button>
+      </div>
+      <div class="tool-group" role="group" aria-label="Controles de zoom">
+        <button class="tool-button zoom" id="zoom-in" type="button" aria-label="Acercar">+</button>
+        <button class="tool-button zoom" id="zoom-out" type="button" aria-label="Alejar">−</button>
+        <button class="tool-button" id="reset-view" type="button">Mundo</button>
+      </div>
+      <div class="tool-group"><button class="tool-button location" id="locate" type="button">Mi ubicación</button></div>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+      const places = [
+        {
+          name: "Belice", country: "Belmopán, Belice", continent: "Centroamérica", lat: 17.251, lng: -88.759,
+          note: "Las culturas garífuna y criolla combinan influencias indígenas caribeñas, africanas y locales.",
+          source: [8.5, -4.0], sourceRegion: "África occidental · referencia amplia",
+          influenceNote: "El origen garífuna es afroindígena y diverso; estudios genéticos señalan varios linajes relacionados con el oeste de África. La flecha es una referencia regional, no un origen exacto.",
+          slides: {
+            Comida: {
+              sections: [
+                {
+                  title: "La chaya en el paisaje culinario",
+                  paragraphs: [
+                    "La chaya es una hoja comestible que aparece en el debate contemporáneo sobre los alimentos locales de Belice. Lauren Miller Griffith y Cameron Griffith estudian cómo se presenta en restaurantes y cómo se relacionan los discursos de autenticidad, salud y cocina local (Griffith and Griffith).",
+                    "El artículo describe la chaya como una hoja verde rica en proteína y recoge investigaciones previas sobre sus posibles propiedades antidiabéticas. Esas propiedades potenciales no equivalen a una recomendación médica ni son el resultado clínico del estudio sobre restaurantes."
+                  ]
+                },
+                {
+                  title: "Tradición, turismo y menús",
+                  paragraphs: [
+                    "Los autores observan que en años recientes aumentó la presencia de platos descritos como “frescos” y “locales”, incluidas ensaladas, en los menús beliceños. También exploran las expectativas de anfitriones y visitantes sobre la comida auténtica y saludable. En ese contexto, proponen que la chaya podría dar mayor visibilidad a ingredientes locales y apoyar la continuidad de las prácticas culinarias (Griffith and Griffith).",
+                    "Sin embargo, la posibilidad de servirla con regularidad se ve limitada por dificultades de abastecimiento y por la posición ambigua de ciertos alimentos locales dentro del mercado turístico. El estudio advierte así que el reconocimiento de un ingrediente no garantiza que llegue de forma estable desde la producción hasta el plato."
+                  ]
+                },
+                {
+                  title: "Un contexto nacional, no una etiqueta étnica",
+                  paragraphs: [
+                    "El perfil de sistemas alimentarios de Belice sitúa la comida dentro de una red más amplia de producción, nutrición, medios de vida, recursos naturales y distribución. Es un marco nacional útil para entender por qué la disponibilidad y el acceso también forman parte de la historia culinaria (FAO et al.).",
+                    "Un estudio genético de la población garífuna relaciona varios linajes paternos con regiones y puertos de África occidental, entre ellos Senegambia y la ensenada de Biafra, y también registra indicios de otras zonas africanas (Beaty). Por eso, la flecha señala una región amplia; no representa un puerto ni un origen único.",
+                    "Importante para este proyecto: el artículo sobre la chaya no la presenta como una comida exclusivamente garífuna ni como prueba de un origen africano. Conviene distinguir este ejemplo de la cocina beliceña contemporánea de las tradiciones afrobeliceñas y garífunas específicas, que deben documentarse con sus propias fuentes y voces comunitarias."
+                  ]
+                }
+              ],
+              citations: [
+                {
+                  text: "Griffith, Lauren Miller, and Cameron Griffith. “Let Them Eat Chaya: Cultural Revitalization through Culinary Offerings in Belize.” Heritage, vol. 4, no. 3, 2021, pp. 1511–1525.",
+                  url: "https://doi.org/10.3390/heritage4030083"
+                },
+                {
+                  text: "Food and Agriculture Organization of the United Nations, European Union, and CIRAD. Food Systems Profile—Belize: Catalysing the Sustainable and Inclusive Transformation of Food Systems. 2022.",
+                  url: "https://doi.org/10.4060/cc0072en"
+                },
+                {
+                  text: "Beaty, Kristine G. Forced Migration and Population Expansion: The Genetic Story of the Garifuna. 2017. ProQuest Dissertations & Theses Global.",
+                  url: "https://www.proquest.com/docview/1964385097"
+                }
+              ]
+            }
+          }
+        },
+        {
+          name: "Costa Rica", country: "Limón, Costa Rica", continent: "Centroamérica", lat: 9.9281, lng: -84.0907,
+          note: "La cultura afrocostarricense tiene raíces importantes en las comunidades caribeñas de Limón y en los intercambios afrocaribeños.",
+          source: [7.9, -1.0], sourceRegion: "África occidental",
+          influenceNote: "Las influencias africanas llegaron a Limón mediante comunidades caribeñas, en particular por la migración jamaicana; su música, comida, lengua y baile reflejan una diáspora diversa."
+        },
+        {
+          name: "Panamá", country: "Ciudad de Panamá, Panamá", continent: "Centroamérica", lat: 8.9824, lng: -79.5199,
+          note: "Las tradiciones afropanameñas incluyen la herencia Congo junto con influencias indígenas, españolas y afrocaribeñas.",
+          source: [-2.4, 15.3], sourceRegion: "África central · región del Congo",
+          influenceNote: "Las tradiciones Congo de Panamá conservan una herencia centroafricana; su música, comida, lengua y baile también reflejan intercambios afrocaribeños."
+        }
+      ];
+
+      const map = L.map("map", { zoomControl: false, minZoom: 2, worldCopyJump: true }).setView([18, 8], 2);
+      const streetTiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">Colaboradores de OpenStreetMap</a>"
+      });
+      const quietTiles = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+        subdomains: "abcd",
+        maxZoom: 19,
+        attribution: "&copy; Colaboradores de OpenStreetMap &copy; CARTO"
+      });
+      streetTiles.addTo(map);
+
+      const markers = new Map();
+      let influenceLayers = [];
+      let activePlace = null;
+      let userMarker = null;
+      let toastTimer;
+      const listElement = document.getElementById("place-list");
+      const slideshowDialog = document.getElementById("slideshow-dialog");
+      const slideshowTitles = ["Música", "Baile", "Comida", "Lengua"];
+      const slideshowTabs = [...slideshowDialog.querySelectorAll(".slideshow-tab")];
+      let currentSlide = 0;
+
+      function iconFor(active = false) {
+        return L.divIcon({
+          className: "",
+          html: `<span class="map-star${active ? " is-active" : ""}" aria-hidden="true">★</span>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        });
+      }
+
+      function renderSlide(index) {
+        currentSlide = (index + slideshowTitles.length) % slideshowTitles.length;
+        document.getElementById("slideshow-title").textContent = slideshowTitles[currentSlide];
+        const slideBody = document.getElementById("slideshow-placeholder");
+        slideBody.replaceChildren();
+        const content = activePlace?.slides?.[slideshowTitles[currentSlide]];
+        if (content) {
+          const article = document.createElement("div");
+          article.className = "slideshow-content";
+          content.sections.forEach((section) => {
+            const heading = document.createElement("h4");
+            heading.textContent = section.title;
+            article.append(heading);
+            section.paragraphs.forEach((text) => {
+              const paragraph = document.createElement("p");
+              paragraph.textContent = text;
+              article.append(paragraph);
+            });
+          });
+          const citationHeading = document.createElement("h4");
+          citationHeading.textContent = "Obras citadas · MLA";
+          const citationList = document.createElement("ol");
+          citationList.className = "slideshow-citations";
+          content.citations.forEach((citation) => {
+            const item = document.createElement("li");
+            const link = document.createElement("a");
+            link.href = citation.url;
+            link.target = "_blank";
+            link.rel = "noreferrer";
+            link.textContent = citation.text;
+            item.append(link);
+            citationList.append(item);
+          });
+          article.append(citationHeading, citationList);
+          slideBody.append(article);
+        } else {
+          slideBody.textContent = `Contenido de ${slideshowTitles[currentSlide].toLocaleLowerCase()} pendiente de carga.`;
+        }
+        document.getElementById("slideshow-count").textContent = `${currentSlide + 1} / ${slideshowTitles.length}`;
+        document.getElementById("slideshow-panel").setAttribute("aria-labelledby", `slideshow-tab-${currentSlide}`);
+        slideshowTabs.forEach((tab, tabIndex) => {
+          const isActive = tabIndex === currentSlide;
+          tab.id = `slideshow-tab-${tabIndex}`;
+          tab.setAttribute("aria-controls", "slideshow-panel");
+          tab.setAttribute("aria-selected", String(isActive));
+          tab.tabIndex = isActive ? 0 : -1;
+          tab.classList.toggle("is-active", isActive);
+        });
+      }
+
+      function openSlideshow(place) {
+        document.getElementById("slideshow-country").textContent = place.name;
+        document.getElementById("slideshow-region").textContent = place.sourceRegion;
+        document.getElementById("slideshow-context").textContent = place.influenceNote;
+        const expandButton = document.getElementById("slideshow-expand");
+        slideshowDialog.classList.remove("is-expanded");
+        expandButton.textContent = "⤢";
+        expandButton.setAttribute("aria-expanded", "false");
+        expandButton.setAttribute("aria-label", "Expandir presentación");
+        renderSlide(0);
+        if (!slideshowDialog.open) slideshowDialog.showModal();
+      }
+
+      places.forEach((place) => {
+        const marker = L.marker([place.lat, place.lng], { icon: iconFor(), title: place.name }).addTo(map);
+        marker.on("click", () => selectPlace(place));
+        markers.set(place.name, marker);
+      });
+
+      function clearInfluence() {
+        influenceLayers.forEach((layer) => {
+          if (typeof layer.closeTooltip === "function") layer.closeTooltip();
+          layer.remove();
+        });
+        influenceLayers = [];
+      }
+
+      function showInfluence(place) {
+        clearInfluence();
+        const routePoints = [[place.lat, place.lng], [18, -58], [22, -32], [17, -10], place.source];
+        const route = L.polyline(routePoints, {
+          color: "#e3b837",
+          weight: 4,
+          opacity: 0.95,
+          dashArray: "9 9",
+          lineCap: "round",
+          className: "influence-route"
+        }).addTo(map);
+        const arrow = L.marker(place.source, {
+          icon: L.divIcon({ className: "", html: '<span class="route-head" aria-hidden="true">➤</span>', iconSize: [28, 28], iconAnchor: [14, 14] }),
+          interactive: false,
+          keyboard: false,
+          zIndexOffset: 1000
+        }).addTo(map);
+        arrow.bindTooltip(place.sourceRegion, { permanent: true, direction: "right", offset: [8, 0], className: "influence-label" });
+        influenceLayers = [route, arrow];
+        map.fitBounds(route.getBounds(), {
+          paddingTopLeft: [34, 94],
+          paddingBottomRight: [34, 34],
+          maxZoom: 3,
+          animate: true
+        });
+      }
+
+      function renderList() {
+        listElement.replaceChildren();
+        places.forEach((place) => {
+          const button = document.createElement("button");
+          button.className = `place-row${activePlace === place ? " is-active" : ""}`;
+          button.type = "button";
+          button.innerHTML = `<span class="place-index">${String(places.indexOf(place) + 1).padStart(2, "0")}</span><span><span class="place-name"></span><span class="place-country"></span></span><span class="place-continent"></span>`;
+          button.querySelector(".place-name").textContent = place.name;
+          button.querySelector(".place-country").textContent = place.country;
+          button.querySelector(".place-continent").textContent = place.continent;
+          button.addEventListener("click", () => selectPlace(place));
+          listElement.append(button);
+        });
+      }
+
+      function selectPlace(place) {
+        activePlace = place;
+        places.forEach((item) => {
+          markers.get(item.name).setIcon(iconFor(item === place));
+        });
+        renderList();
+        showInfluence(place);
+        openSlideshow(place);
+      }
+
+      function showToast(message) {
+        const toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.classList.add("is-visible");
+        window.clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(() => toast.classList.remove("is-visible"), 2800);
+      }
+
+      slideshowTabs.forEach((tab, index) => tab.addEventListener("click", () => renderSlide(index)));
+      document.getElementById("slide-previous").addEventListener("click", () => renderSlide(currentSlide - 1));
+      document.getElementById("slide-next").addEventListener("click", () => renderSlide(currentSlide + 1));
+      document.getElementById("slideshow-expand").addEventListener("click", (event) => {
+        const isExpanded = slideshowDialog.classList.toggle("is-expanded");
+        event.currentTarget.textContent = isExpanded ? "⤡" : "⤢";
+        event.currentTarget.setAttribute("aria-expanded", String(isExpanded));
+        event.currentTarget.setAttribute("aria-label", isExpanded ? "Contraer presentación" : "Expandir presentación");
+      });
+      document.getElementById("slideshow-close").addEventListener("click", () => slideshowDialog.close());
+      slideshowDialog.addEventListener("click", (event) => {
+        if (event.target === slideshowDialog) slideshowDialog.close();
+      });
+      slideshowDialog.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowLeft") renderSlide(currentSlide - 1);
+        if (event.key === "ArrowRight") renderSlide(currentSlide + 1);
+      });
+      slideshowDialog.addEventListener("close", () => {
+        activePlace = null;
+        slideshowDialog.classList.remove("is-expanded");
+        places.forEach((place) => markers.get(place.name).setIcon(iconFor()));
+        clearInfluence();
+        renderList();
+      });
+      document.getElementById("zoom-in").addEventListener("click", () => map.zoomIn());
+      document.getElementById("zoom-out").addEventListener("click", () => map.zoomOut());
+      document.getElementById("reset-view").addEventListener("click", () => map.flyTo([18, 8], 2, { duration: 0.7 }));
+      document.getElementById("street-layer").addEventListener("click", () => {
+        if (!map.hasLayer(streetTiles)) quietTiles.removeFrom(map);
+        streetTiles.addTo(map);
+        document.getElementById("street-layer").setAttribute("aria-pressed", "true");
+        document.getElementById("quiet-layer").setAttribute("aria-pressed", "false");
+      });
+      document.getElementById("quiet-layer").addEventListener("click", () => {
+        if (!map.hasLayer(quietTiles)) streetTiles.removeFrom(map);
+        quietTiles.addTo(map);
+        document.getElementById("street-layer").setAttribute("aria-pressed", "false");
+        document.getElementById("quiet-layer").setAttribute("aria-pressed", "true");
+      });
+      document.getElementById("locate").addEventListener("click", () => {
+        if (!navigator.geolocation) {
+          showToast("La ubicación no está disponible en este navegador.");
+          return;
+        }
+        navigator.geolocation.getCurrentPosition((position) => {
+          const point = [position.coords.latitude, position.coords.longitude];
+          if (userMarker) userMarker.remove();
+          userMarker = L.marker(point, {
+            icon: L.divIcon({ className: "", html: '<span class="user-dot"></span>', iconSize: [15, 15], iconAnchor: [8, 8] }),
+            title: "Your location"
+          }).addTo(map);
+          map.flyTo(point, 8, { duration: 0.8 });
+        }, () => showToast("No se pudo acceder a tu ubicación."), { enableHighAccuracy: false, timeout: 8000 });
+      });
+
+      renderList();
+      window.setTimeout(() => map.invalidateSize(), 100);
+    </script>
+  </body>
+</html>
